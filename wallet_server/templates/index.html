@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Wallet</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script>
+        $(function () {
+            $.ajax({
+                url: '/wallet',
+                type: 'POST',
+                success: function (response) {
+                    $('#public_key').val(response['publicKey']);
+                    $('#private_key').val(response['privateKey']);
+                    $('#blockchain_address').val(response['address']);
+                },
+                error: function (error) {
+                    console.error(error);
+                }
+            })
+
+            $('#send_coins_button').click(function () {
+                const transactionData = {
+                    'sender_private_key': $('#private_key').val(),
+                    'sender_publick_key': $('#public_key').val(),
+                    'value': $('#send_amount').val(),
+                    'recipient_address': $('#recipient_address').val()
+                }
+
+                if (!transactionData.value || !transactionData.recipient_address) {
+                    alert("Enter the amount and recipient's address")
+                    return
+                }
+
+                const confirmText = `Are you sure to send ${transactionData.value} coins to ${transactionData.recipient_address}?`;
+                let confirmResult = confirm(confirmText)
+
+                if (confirmResult !== true) {
+                    alert('Operation was canceled')
+                    return
+                }
+
+                $.ajax({
+                    url: '/transaction',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(transactionData),
+                    success: function (response) {
+                        console.info(response)
+                        alert('Transaction was added successfully')
+                    },
+                    error: function (error) {
+                        console.error(error)
+                        alert('Transaction was failed, check console for more information')
+                    },
+                })
+            })
+        })
+    </script>
+    <style>
+        * {
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+
+    <div>
+        <h1>Wallet</h1>
+        <div id="wallet_amount">0</div>
+        <button id="refresh_wallet">Refresh Data</button>
+
+        <p>Public Key</p>
+        <textarea id="public_key" rows="2" cols="100"></textarea>
+
+        <p>Private Key</p>
+        <textarea id="private_key" rows="1" cols="100"></textarea>
+
+        <p>Blockchain Address</p>
+        <textarea id="blockchain_address" rows="1" cols="100"></textarea>
+    </div>
+
+    <div>
+        <h1>Send Money</h1>
+        <div>
+            Address: <input id="recipient_address" size="100" type="text">
+            <br>
+            Amount: <input id="send_amount" type="number">
+            <br>
+            <button id="send_coins_button">Send</button>
+        </div>
+    </div>
+
+</body>
+</html>

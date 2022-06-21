@@ -113,8 +113,30 @@ func (server *Server) Transactions(writer http.ResponseWriter, req *http.Request
 	}
 }
 
+func (server *Server) Mine(writer http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		blockchain := server.GetBlockchain()
+		isMined := blockchain.Mining()
+
+		var marshal []byte
+		if !isMined {
+			writer.WriteHeader(http.StatusBadRequest)
+			marshal = []byte("Block wasn't mined")
+		} else {
+			marshal = []byte("Block was mined")
+		}
+
+		writer.Header().Add("Content-Type", "apllication/json")
+		io.WriteString(writer, string(marshal))
+	default:
+		writer.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
 func (server *Server) Run() {
 	http.HandleFunc("/", server.GetChain)
 	http.HandleFunc("/transactions", server.Transactions)
+	http.HandleFunc("/mine", server.Mine)
 	log.Fatal(http.ListenAndServe("0.0.0.0:"+strconv.Itoa(int(server.Port())), nil))
 }

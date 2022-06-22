@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -29,6 +30,7 @@ type Blockchain struct {
 	chain             []*Block
 	blockchainAddress string
 	port              uint16
+	mux               sync.Mutex
 }
 
 type TransactionRequest struct {
@@ -39,10 +41,15 @@ type TransactionRequest struct {
 	Signature        *string  `json:"signature"`
 }
 
+type AmountResponse struct {
+	Amount float32 `json:"amount"`
+}
+
 const (
 	MINING_DIFFICULTY = 3
 	MINING_SENDER     = "BLOCKCHAIN"
 	MINING_REWARD     = 1.0
+	MINING_TIMER_SEC  = 20
 )
 
 // NewTransaction generates and returns new Transaction
@@ -106,6 +113,14 @@ func (blockchain *Blockchain) MarshalJSON() ([]byte, error) {
 		Blocks []*Block `json:"chains"`
 	}{
 		Blocks: blockchain.chain,
+	})
+}
+
+func (amountResponse *AmountResponse) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Amount float32 `json:"amount"`
+	}{
+		Amount: amountResponse.Amount,
 	})
 }
 
@@ -228,6 +243,13 @@ func (blockchain *Blockchain) ProofOfWork() int {
 
 // Mining creates new block in the Blockchain
 func (blockchain *Blockchain) Mining() bool {
+	blockchain.mux.Lock()
+	defer blockchain.mux.Unlock()
+
+	if len(blockchain.transactionPool) == 0 {
+		return false
+	}
+
 	blockchain.AddTransaction(MINING_SENDER, blockchain.blockchainAddress, MINING_REWARD, nil, nil)
 
 	nonce := blockchain.ProofOfWork()
@@ -235,6 +257,11 @@ func (blockchain *Blockchain) Mining() bool {
 
 	blockchain.CreateBlock(nonce, previousHash)
 	return true
+}
+
+func (blockchain *Blockchain) StartMining() {
+	blockchain.Mining()
+	_ = time.AfterFunc(time.Second*MINING_TIMER_SEC, blockchain.StartMining)
 }
 
 // CalculateTotalAmount iterates through all transactions in the Blockchain
@@ -271,6 +298,7 @@ func (transactionRequest *TransactionRequest) Validate() bool {
 	return true
 }
 
+// TransactionPool returns blockchain transaction pool
 func (blockchain *Blockchain) TransactionPool() []*Transaction {
 	return blockchain.transactionPool
 }

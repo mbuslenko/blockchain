@@ -6,6 +6,7 @@ import (
 	"crypto-blockchain/utils"
 	"crypto-blockchain/wallet"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -109,9 +110,60 @@ func (walletServer *WalletServer) CreateTransaction(writer http.ResponseWriter, 
 	}
 }
 
+func (server *WalletServer) GetBalance(writer http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		address := req.URL.Query().Get("address")
+		if address == "" {
+			writer.WriteHeader(http.StatusBadRequest)
+		}
+
+		endpoint := fmt.Sprintf("%s/amount", server.Gateway())
+
+		client := &http.Client{}
+		blockchainServerRequest, _ := http.NewRequest("GET", endpoint, nil)
+		query := blockchainServerRequest.URL.Query()
+		query.Add("address", address)
+		blockchainServerRequest.URL.RawQuery = query.Encode()
+
+		blockchainServerResponse, err := client.Do(blockchainServerRequest)
+		if err != nil {
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		writer.Header().Add("Content-Type", "application/json")
+		if blockchainServerResponse.StatusCode == http.StatusOK {
+			decoder := json.NewDecoder(blockchainServerResponse.Body)
+
+			var bar block.AmountResponse
+			err := decoder.Decode(&bar)
+			if err != nil {
+				writer.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			marshal, _ := json.Marshal(struct {
+				Message string  `json:"message"`
+				Amount  float32 `json:"amount"`
+			}{
+				Message: "success",
+				Amount:  bar.Amount,
+			})
+
+			io.WriteString(writer, string(marshal[:]))
+		} else {
+			writer.WriteHeader(http.StatusBadRequest)
+		}
+	default:
+		writer.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
 func (walletServer *WalletServer) Run() {
 	http.HandleFunc("/", walletServer.Index)
 	http.HandleFunc("/wallet", walletServer.Wallet)
+	http.HandleFunc("/wallet/balance", walletServer.GetBalance)
 	http.HandleFunc("/transaction", walletServer.CreateTransaction)
 	log.Fatal(http.ListenAndServe("127.0.0.1:"+strconv.Itoa(int(walletServer.Port())), nil))
 }

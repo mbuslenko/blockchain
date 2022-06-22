@@ -134,9 +134,45 @@ func (server *Server) Mine(writer http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (server *Server) StartMine(writer http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		blockchain := server.GetBlockchain()
+		blockchain.StartMining()
+
+		marshal := []byte("Mining was ended successfully")
+		writer.Header().Add("Content-Type", "apllication/json")
+		io.WriteString(writer, string(marshal))
+	default:
+		writer.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func (server *Server) Amount(writer http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case http.MethodGet:
+		address := req.URL.Query().Get("address")
+		if address == "" {
+			writer.WriteHeader(http.StatusBadRequest)
+		}
+
+		amount := server.GetBlockchain().CalculateTotalAmount(address)
+		amountResponse := &block.AmountResponse{amount}
+		marshal, _ := json.Marshal(amountResponse)
+
+		writer.Header().Add("Content-Type", "application/json")
+		io.WriteString(writer, string(marshal[:]))
+
+	default:
+		writer.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
 func (server *Server) Run() {
 	http.HandleFunc("/", server.GetChain)
 	http.HandleFunc("/transactions", server.Transactions)
 	http.HandleFunc("/mine", server.Mine)
+	http.HandleFunc("/mine/start", server.StartMine)
+	http.HandleFunc("/amount", server.Amount)
 	log.Fatal(http.ListenAndServe("0.0.0.0:"+strconv.Itoa(int(server.Port())), nil))
 }

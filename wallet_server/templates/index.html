@@ -55,6 +55,25 @@
                     },
                 })
             })
+
+            function reload_amount() {
+                let data = {'address': $('#blockchain_address').val()}
+                $.ajax({
+                    url: '/wallet/balance',
+                    type: 'GET',
+                    data: data,
+                    success: function (response) {
+                        $('#wallet_amount').text(response['amount']);
+                    },
+                    error: function (error) {
+                        console.error(error);
+                    }
+                })
+            }
+
+            $('#reload_wallet').click(function () {
+                reload_amount()
+            });
         })
     </script>
     <style>
